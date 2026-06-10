@@ -7,6 +7,7 @@ import pytest
 
 from qcge.backends import get_backend, available_backends
 from qcge.backends.numpy_backend import NumpyBackend
+from qcge.backends.python_backend import PySimBackend
 from qcge.backends.qiskit_backend import QiskitBackend
 from qcge.ir import CircuitIR
 from qcge.result import SimulationResult
@@ -17,13 +18,23 @@ def test_numpy_always_available():
     assert isinstance(get_backend("numpy"), NumpyBackend)
 
 
+def test_python_always_available():
+    # The pure-Python backend has no third-party deps, so it is always usable -
+    # this is what the browser build relies on.
+    assert "python" in available_backends()
+    assert isinstance(get_backend("python"), PySimBackend)
+
+
 def test_aliases():
-    assert isinstance(get_backend("sim"), NumpyBackend)
+    # "sim" now resolves to the dependency-free pure-Python backend (browser-safe).
+    assert isinstance(get_backend("sim"), PySimBackend)
 
 
-def test_auto_prefers_qiskit_when_present():
+def test_auto_prefers_qiskit_else_python():
+    # auto never falls back to numpy (importing numpy breaks pygbag); the
+    # dependency-free pure-Python backend is the fallback.
     auto = get_backend("auto")
-    expected = "qiskit" if QiskitBackend.is_available() else "numpy"
+    expected = "qiskit" if QiskitBackend.is_available() else "python"
     assert auto.name == expected
 
 
@@ -60,3 +71,26 @@ def test_probabilities_sum_to_one():
     ir = CircuitIR(3).add("h", (0,)).add("h", (1,)).add("h", (2,))
     res = NumpyBackend().run(ir)
     assert math.isclose(float(np.sum(res.probabilities())), 1.0, abs_tol=1e-9)
+
+
+@pytest.mark.parametrize("ir", [
+    CircuitIR(1).add("h", (0,)).add("t", (0,)),
+    CircuitIR(2).add("h", (0,)).add("x", (1,), controls=(0,)),                              # Bell
+    CircuitIR(3).add("h", (0,)).add("x", (1,), controls=(0,)).add("x", (2,), controls=(1,)),  # GHZ
+    CircuitIR(2).add("ry", (0,), param=0.9).add("z", (1,), controls=(0,)),
+    CircuitIR(2).add("x", (0,)).add("swap", (0, 1)),
+])
+def test_python_matches_numpy(ir):
+    # The pure-Python (browser) backend must agree with numpy exactly.
+    a = PySimBackend().run(ir).statevector
+    b = NumpyBackend().run(ir).statevector
+    assert max(abs(complex(x) - complex(y)) for x, y in zip(a, b)) < 1e-12
+
+
+def test_result_is_numpy_free_with_plain_list():
+    # SimulationResult must work on a plain Python list - the browser path never
+    # produces numpy arrays.
+    res = SimulationResult(statevector=[0j, 0j, 0j, 1 + 0j], num_qubits=2)
+    assert res.most_likely() == "11"
+    assert res.probabilities() == [0.0, 0.0, 0.0, 1.0]
+    assert res.sample_counts(100) == {"11": 100}

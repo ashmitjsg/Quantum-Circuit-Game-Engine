@@ -2,6 +2,7 @@ import pygame
 import numpy as np
 
 from pygame.image import load as loadImage
+from qcge import configs
 from qcge.configs import *
 from qcge.ir import CircuitIR
 from qcge.backends import get_backend
@@ -47,7 +48,7 @@ class QuantumCircuitGridBackground(pygame.sprite.Sprite):
 class QuantumCircuitGridMarker(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
-        self.image = loadImage(f"{ASSETS_PATH}/circuit-grid-cursor.png").convert_alpha()
+        self.image = loadImage(f"{configs.ASSETS_PATH}/circuit-grid-cursor.png").convert_alpha()
         self.rect = self.image.get_rect()
 
 class QuantumCircuitGridNode:
@@ -80,7 +81,7 @@ class QuantumCircuitGridGate(pygame.sprite.Sprite):
         self.run()
     
     def import_gate(self, gate_name, colorkey = None):
-        gate_image_folder = ASSETS_PATH
+        gate_image_folder = configs.ASSETS_PATH
         gate_image = loadImage(f"{gate_image_folder}/{gate_name}")
         if colorkey is not None:
             if colorkey == -1:
@@ -288,8 +289,12 @@ class QuantumCircuitGridModel():
         return QiskitBackend().to_qiskit(self.to_ir())
 
 class QuantumCircuitGrid(pygame.sprite.RenderPlain):
-    def __init__(self, position, num_qubits, num_columns, background_color=QUANTUM_CIRCUIT_BG_COLOR, wire_color=QUANTUM_CIRCUIT_WIRE_COLOR, gate_phase_angle_color=QUANTUM_GATE_PHASE_COLOR, tile_size=QUANTUM_CIRCUIT_TILE_SIZE, gate_dimensions=[GATE_TILE_WIDTH, GATE_TILE_HIEGHT], wire_line_width=WIRE_LINE_WIDTH, backend="auto"):
+    def __init__(self, position, num_qubits, num_columns, background_color=QUANTUM_CIRCUIT_BG_COLOR, wire_color=QUANTUM_CIRCUIT_WIRE_COLOR, gate_phase_angle_color=QUANTUM_GATE_PHASE_COLOR, tile_size=QUANTUM_CIRCUIT_TILE_SIZE, gate_dimensions=[GATE_TILE_WIDTH, GATE_TILE_HIEGHT], wire_line_width=WIRE_LINE_WIDTH, backend="auto", assets_path=None):
         super().__init__()
+
+        ## Gate-image folder; set before any sprite (which loads images) is created.
+        if assets_path is not None:
+            configs.ASSETS_PATH = assets_path
 
         ## Props
         self.background_color = background_color
@@ -315,7 +320,10 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
             (self.qc_grid_model.num_qubits, self.qc_grid_model.num_columns),
             dtype=QuantumCircuitGridGate
         )
-    
+
+        # build gate-tile sprites and register them in the render group
+        self.build_tiles()
+
     ## SUPPORT FUNCTIONS
     def highlight_current_node(self, wire, column):
         self.current_wire = wire
@@ -365,7 +373,7 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
     def update_qc_grid_background(self):
         self.qc_grid_background.rect.topleft = self.position
     
-    def updage_gate_tiles(self):
+    def update_gate_tiles(self):
         for wire in range(self.qc_grid_model.num_qubits):
             for column in range(self.qc_grid_model.num_columns):
                 gate_tile = self.gate_tiles[wire][column]
@@ -377,7 +385,7 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
     def update(self):
         self.update_sprites()
         self.update_qc_grid_background()
-        self.updage_gate_tiles()
+        self.update_gate_tiles()
         self.highlight_current_node(self.current_wire, self.current_column)
     
     ## HANDLE INPUTS
@@ -605,8 +613,9 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
             case pygame.K_e:
                 self.handle_input_rotate(np.pi / 8)
 
-    ## RUN, DRAW AND UPDATE EVERYTHING
-    def run(self):
+    ## BUILD, DRAW AND UPDATE EVERYTHING
+    def build_tiles(self):
+        """Create a gate-tile sprite for every grid cell and register the render group."""
         ## Create QuantumCircuitGridGate Object for each gate in the qc_circuit_grid
         for wire in range(self.qc_grid_model.num_qubits):
             for column in range(self.qc_grid_model.num_columns):

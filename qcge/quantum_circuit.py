@@ -100,7 +100,8 @@ class QuantumCircuitGridGate(pygame.sprite.Sprite):
             node = self.qc_grid_model.get_node(self.wire, self.column)
             # Check if this is a CNOT Gate
             if node.first_ctrl >= 0 or node.second_ctrl >= 0:
-                if self.wire > max(node.ctrl_a, node.ctrl_b): # If target wire is below control wire
+                ctrl_wires = [c for c in (node.first_ctrl, node.second_ctrl) if c >= 0]
+                if self.wire > max(ctrl_wires): # If target wire is below control wire
                     self.image, self.rect = self.import_gate("not_gate_below_ctrl.png", -1)
                 else: # If target wire is above control wire
                     self.image, self.rect = self.import_gate("not_gate_above_ctrl.png", -1)
@@ -224,17 +225,16 @@ class QuantumCircuitGridModel():
         return GATES['EMPTY']
 
     def get_wire_for_control_node_at(self, control_wire, column):
-        control_wire = -1
+        # Return the wire of the gate controlled by control_wire in this column
+        # (i.e. the gate node whose first/second control points back here), or -1.
         column_nodes = [self.nodes[w][column] for w in range(self.num_qubits)]
 
         for index in range(self.num_qubits):
-            if index != control_wire:
-                other_node = column_nodes[index]
-                if other_node:
-                    if (other_node.first_ctrl == control_wire or other_node.second_ctrl == control_wire):
-                        control_wire = index
-        
-        return control_wire
+            other_node = column_nodes[index]
+            if other_node and (other_node.first_ctrl == control_wire or other_node.second_ctrl == control_wire):
+                return index
+
+        return -1
 
     def to_ir(self):
         """Emit a backend-agnostic :class:`~qcge.ir.CircuitIR` from the grid.
@@ -490,34 +490,33 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
 
     def handle_input_ctrl(self):
         gate_at_current_node = self.get_gate_at_current_node()
-        if(
-            gate_at_current_node == GATES['X']
-            or gate_at_current_node == GATES['Y']
-            or gate_at_current_node == GATES['Z']
-            or gate_at_current_node == GATES['H']
-        ):
-            qc_grid_node = self.qc_grid_model.get_node(self.current_wire, self.current_column)
-            if qc_grid_node.first_ctrl >= 0:
-                # Gate have a control qubit so remove it
-                orignal_first_ctrl = qc_grid_node.first_ctrl
-                qc_grid_node.first_ctrl = -1
-                self.qc_grid_model.set_node(self.current_wire, self.current_column, qc_grid_node)
+        # Only an actual X/Y/Z/H gate can be given a control. Bail out otherwise -
+        # in particular on an empty cell, where get_node() returns 0 and trying to
+        # place a control would crash in set_node ('int' has no attribute gate_type).
+        if gate_at_current_node not in (GATES['X'], GATES['Y'], GATES['Z'], GATES['H']):
+            return
 
-                # Remove Control Line Nodes
-                for wire in range(
-                    min(self.current_wire, orignal_first_ctrl) + 1,
-                    max(self.current_column, orignal_first_ctrl)
-                ):
-                    if(self.qc_grid_model.get_gate_at_node(wire, self.current_column) == GATES['CTRL_LINE']):
-                        self.qc_grid_model.set_node(wire, self.current_column, QuantumCircuitGridNode(GATES['EMPTY']))
-                self.update()
+        qc_grid_node = self.qc_grid_model.get_node(self.current_wire, self.current_column)
+        if qc_grid_node.first_ctrl >= 0:
+            # Gate already has a control qubit, so remove it
+            orignal_first_ctrl = qc_grid_node.first_ctrl
+            qc_grid_node.first_ctrl = -1
+            self.qc_grid_model.set_node(self.current_wire, self.current_column, qc_grid_node)
+
+            # Remove Control Line Nodes
+            for wire in range(
+                min(self.current_wire, orignal_first_ctrl) + 1,
+                max(self.current_column, orignal_first_ctrl)
+            ):
+                if(self.qc_grid_model.get_gate_at_node(wire, self.current_column) == GATES['CTRL_LINE']):
+                    self.qc_grid_model.set_node(wire, self.current_column, QuantumCircuitGridNode(GATES['EMPTY']))
+            self.update()
         else:
-            # Attempt to place a control qubit beginning with the wire above
-            if self.current_wire >= 0:
-                if (self.place_ctrl_qubit(self.current_wire, self.current_wire - 1) == -1):
-                    if self.current_wire < self.qc_grid_model.num_qubits:
-                        if(self.place_ctrl_qubit(self.current_wire, self.current_wire + 1) == -1):
-                            self.display_exceptional_condition()
+            # No control yet: place one, trying the wire above first, then below.
+            # If neither neighbour is free there is simply nowhere to put the control,
+            # so do nothing (the player can move the gate or clear a wire and retry).
+            if (self.place_ctrl_qubit(self.current_wire, self.current_wire - 1) == -1):
+                self.place_ctrl_qubit(self.current_wire, self.current_wire + 1)
 
     def handle_input_move_ctrl(self, direction):
         gate_at_current_node = self.get_gate_at_current_node()
@@ -540,7 +539,7 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
                         candidate_ctrl_wire += 1 # Move down to next wire below
             
                 if 0 <= candidate_ctrl_wire < self.qc_grid_model.num_qubits:
-                    if (self.place_ctrl_quabit(self.current_wire, candidate_ctrl_wire) == candidate_ctrl_wire):
+                    if (self.place_ctrl_qubit(self.current_wire, candidate_ctrl_wire) == candidate_ctrl_wire):
                         if (direction == QUANTUM_CIRCUIT_MARKER_MOVE_UP and candidate_ctrl_wire < self.current_wire):
                             if (self.qc_grid_model.get_gate_at_node(candidate_ctrl_wire + 1, self.current_column) == GATES['EMPTY']):
                                 self.qc_grid_model.set_node(candidate_ctrl_wire + 1, self.current_column, QuantumCircuitGridNode(GATES['CTRL_LINE']))
@@ -566,18 +565,33 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
         self.update()
 
     def place_ctrl_qubit(self, gate_wire, candidate_ctrl_wire):
-        # Attempt to place a control qubit on a wire. If successful, return the wire number. If not, return -1
+        # Attempt to attach a control on candidate_ctrl_wire for the gate on
+        # gate_wire (same column). Returns the control wire on success, else -1.
         if (candidate_ctrl_wire < 0 or candidate_ctrl_wire >= self.qc_grid_model.num_qubits):
             return -1
-        
+
         candidate_ctrl_wire_gate = self.qc_grid_model.get_gate_at_node(candidate_ctrl_wire, self.current_column)
 
         if (candidate_ctrl_wire_gate == GATES['EMPTY'] or candidate_ctrl_wire_gate == GATES['CTRL_LINE']):
+            # Recording the control on the gate node is what actually makes it a
+            # controlled gate (CX/CY/...); get_gate_at_node then reports the control
+            # wire as a CTRL, and to_ir() emits the control. (Previously this was
+            # never set, so the control - and its connecting line - never appeared.)
             qc_grid_node = self.qc_grid_model.get_node(gate_wire, self.current_column)
+            qc_grid_node.first_ctrl = candidate_ctrl_wire
             self.qc_grid_model.set_node(gate_wire, self.current_column, qc_grid_node)
-            self.qc_grid_model.set_node(candidate_ctrl_wire, self.current_column, QuantumCircuitGridNode(GATES['EMPTY']))
+
+            # Draw the vertical connector on any wires strictly between the gate and
+            # its control.
+            low, high = sorted((gate_wire, candidate_ctrl_wire))
+            for wire in range(low + 1, high):
+                if self.qc_grid_model.get_gate_at_node(wire, self.current_column) == GATES['EMPTY']:
+                    self.qc_grid_model.set_node(wire, self.current_column, QuantumCircuitGridNode(GATES['CTRL_LINE']))
+
             self.update()
             return candidate_ctrl_wire
+
+        return -1
 
     def delete_controls_for_gate(self, gate_wire, column):
         first_control_wire = self.qc_grid_model.get_node(gate_wire, column).first_ctrl

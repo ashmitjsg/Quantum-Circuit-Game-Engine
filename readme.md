@@ -68,9 +68,9 @@ You can use it simply by creating an object of the `QuantumCircuitGrid` class st
 - `background_color` (Optional Default Value = '#444654'): Background Color of the Quantum Circuit.
 - `wire_color` (Optional Default Value = '#ffffff'): Color of Quantum Wire in the Quantum Circuit.
 - `gate_phase_angle_color` (Optional Default Value = '#97ad40'): Color to represent phase angle of Rotation Gates.
-- `backend` (Optional, Default `"auto"`): execution backend — `"auto"`, `"qiskit"`, `"python"`/`"sim"`, or `"numpy"` (see below).
+- `backend` (Optional, Default `"auto"`): execution backend - `"auto"`, `"qiskit"`, `"python"`/`"sim"`, or `"numpy"` (see below).
 - `assets_path` (Optional): folder to load gate images from, if you want to ship your own gate art instead of the bundled graphics.
-- `movement_keys` (Optional, Default `"both"`): which keys move the circuit cursor — `"wasd"`, `"arrows"`, or `"both"`. Use `"arrows"` to free the **S** key for the S gate.
+- `movement_keys` (Optional, Default `"both"`): which keys move the circuit cursor - `"wasd"`, `"arrows"`, or `"both"`. Use `"arrows"` to free the **S** key for the S gate.
 - `allowed_gates` (Optional, Default `None` = all): a list/tuple restricting the gate palette the player may place, e.g. `("H", "X", "CTRL")`. Useful for tutorial levels. Tokens come from `SUPPORTED_INPUT_GATES`.
 
 ### Running (simulating) the circuit

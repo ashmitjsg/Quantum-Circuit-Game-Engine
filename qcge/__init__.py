@@ -1,20 +1,20 @@
 """qcge - Quantum Circuit Game Engine.
 
 A pygame-based engine for building quantum-circuit games, with a pluggable
-execution backend: real Qiskit on the desktop, or a dependency-free numpy
+execution backend: real Qiskit on the desktop, or a dependency-free pure-Python
 statevector simulator that also runs in the browser (pygbag/WebAssembly).
+
+Importing qcge stays numpy-free: the core (grid UI, IR, result) and the registry
+have no numpy dependency, and the numpy/qiskit backends are exposed lazily via
+module ``__getattr__``. This is required for the browser build - importing numpy
+inside pygbag breaks the SDL display - so the default ``backend="auto"`` resolves
+to the pure-Python simulator there without ever importing numpy.
 """
 
 from qcge.configs import *
 from qcge.ir import CircuitIR, GateOp, SUPPORTED_GATES
 from qcge.result import SimulationResult
-from qcge.backends import (
-    QuantumBackend,
-    NumpyBackend,
-    QiskitBackend,
-    get_backend,
-    available_backends,
-)
+from qcge.backends import QuantumBackend, get_backend, available_backends
 from qcge.quantum_circuit import QuantumCircuitGrid
 
 __version__ = "2.0.0"
@@ -28,7 +28,18 @@ __all__ = [
     "QuantumBackend",
     "NumpyBackend",
     "QiskitBackend",
+    "PySimBackend",
     "get_backend",
     "available_backends",
     "__version__",
 ]
+
+# Concrete backends are lazy so `import qcge` never imports numpy/qiskit.
+_LAZY = {"NumpyBackend", "QiskitBackend", "PySimBackend"}
+
+
+def __getattr__(name):  # PEP 562
+    if name in _LAZY:
+        from qcge import backends
+        return getattr(backends, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

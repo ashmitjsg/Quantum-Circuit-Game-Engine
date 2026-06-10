@@ -8,8 +8,9 @@ This Quantum Circuit was originaly created for the **QPong Game** developed by <
 
 The features I have included are:
 - Modular and Abstract Code.
-- **Pluggable execution backends (new in v2):** run circuits with real **Qiskit** on the desktop, or a dependency-free **numpy statevector simulator** that also works in the browser (pygbag/WebAssembly), where Qiskit cannot run. The engine auto-selects the best available backend.
-- **Qiskit is optional.** `pip install qcge` ships the simulator; `pip install qcge[qiskit]` adds the real Qiskit backend (Qiskit **2.x**; 1.x is end-of-life).
+- **Pluggable execution backends (new in v2):** run circuits with real **Qiskit** on the desktop, or a **pure-Python statevector simulator** (zero third-party dependencies) that also runs in the browser (pygbag/WebAssembly), where Qiskit cannot. A numpy simulator is also available for desktop use. The engine auto-selects the best backend.
+- **Browser-safe by design.** The pure-Python backend imports nothing beyond the standard library. This matters: importing **numpy** inside a pygbag/WebAssembly build breaks the SDL display (grey screen / *"video driver did not add any displays"*), so the browser path must stay numpy-free. `import qcge` is numpy-free (the numpy/qiskit backends are lazy), and `backend="auto"` resolves to the pure-Python simulator in the browser automatically.
+- **Qiskit is optional.** `pip install qcge` ships the simulators; `pip install qcge[qiskit]` adds the real Qiskit backend (Qiskit **2.x**; 1.x is end-of-life).
 - All configurations in one place in the `config.py` file.
 - Developers can create a Quantum Circuit for any number of qubit/wires and circuit width (max. number of gates which can be applied in a wire) of their choice. 
 - Easy to change UI by replacing color configs and graphics for gates with those of your choice. 
@@ -67,6 +68,10 @@ You can use it simply by creating an object of the `QuantumCircuitGrid` class st
 - `background_color` (Optional Default Value = '#444654'): Background Color of the Quantum Circuit.
 - `wire_color` (Optional Default Value = '#ffffff'): Color of Quantum Wire in the Quantum Circuit.
 - `gate_phase_angle_color` (Optional Default Value = '#97ad40'): Color to represent phase angle of Rotation Gates.
+- `backend` (Optional, Default `"auto"`): execution backend — `"auto"`, `"qiskit"`, `"python"`/`"sim"`, or `"numpy"` (see below).
+- `assets_path` (Optional): folder to load gate images from, if you want to ship your own gate art instead of the bundled graphics.
+- `movement_keys` (Optional, Default `"both"`): which keys move the circuit cursor — `"wasd"`, `"arrows"`, or `"both"`. Use `"arrows"` to free the **S** key for the S gate.
+- `allowed_gates` (Optional, Default `None` = all): a list/tuple restricting the gate palette the player may place, e.g. `("H", "X", "CTRL")`. Useful for tutorial levels. Tokens come from `SUPPORTED_INPUT_GATES`.
 
 ### Running (simulating) the circuit
 
@@ -76,7 +81,7 @@ removed `BasicAer`/`execute`:
 ```python
 from qcge import QuantumCircuitGrid
 
-# backend="auto" (default) -> Qiskit if installed, else the numpy simulator
+# backend="auto" (default) -> Qiskit if installed, else the pure-Python simulator
 grid = QuantumCircuitGrid(position=(0, 0), num_qubits=2, num_columns=8)
 
 # ...player builds a circuit on the grid...
@@ -91,11 +96,14 @@ Choose or switch the backend explicitly:
 
 ```python
 QuantumCircuitGrid(..., backend="qiskit")  # real Qiskit (needs qcge[qiskit])
-QuantumCircuitGrid(..., backend="sim")     # numpy simulator (browser-safe, zero extra deps)
-grid.set_backend("numpy")                  # switch at runtime
+QuantumCircuitGrid(..., backend="python")  # pure-Python simulator (browser-safe, zero deps)
+QuantumCircuitGrid(..., backend="sim")     # alias for the pure-Python simulator
+grid.set_backend("numpy")                  # numpy simulator (desktop convenience)
 
 from qcge import available_backends, get_backend
-available_backends()                        # e.g. ["qiskit", "numpy"] or ["numpy"]
+available_backends()                        # e.g. ["qiskit", "python", "numpy"]
+# "auto" prefers Qiskit on desktop and the pure-Python simulator otherwise; it
+# never auto-selects numpy, so the browser path stays numpy-free.
 ```
 
 You can still get a raw `qiskit.QuantumCircuit` when needed (requires the qiskit extra):
@@ -124,7 +132,7 @@ gate_phase_angle_color = '#97ad40'
 <!-- ------------------------------------------------------------------------- -->
 <h2>Game Controls for Building Quantum Circuit</h2>
 
-- **W, A, S, D Keys:** Move the "Circuit Cursor" in the Quantum Circuit to the place where you want to add a gate in the circuit.
+- **W, A, S, D Keys** (or the **Arrow keys**, configurable via `movement_keys`)**:** Move the "Circuit Cursor" in the Quantum Circuit to the place where you want to add a gate in the circuit.
 - **Backspace Key:** Remove the gate present at the Circuit Cursor.
 - **Delete Key:** Clear the Quantum Circuit, i.e., remove all gates from the Quantum Circuit.
 - **X Key:** Add X Gate to the quantum circuit.

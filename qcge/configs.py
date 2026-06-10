@@ -16,6 +16,13 @@ GATES = {
     'CTRL_LINE': 12 # The Vertical Line between a gate part and a "control" or "swap" part
 }
 
+# Tokens accepted by QuantumCircuitGrid(allowed_gates=...) to restrict the player's
+# gate palette. "CTRL" = the control modifier (makes a gate controlled); "ROTATE" =
+# turning X/Y/Z into RX/RY/RZ via the rotate keys.
+SUPPORTED_INPUT_GATES = {
+    'X', 'Y', 'Z', 'H', 'S', 'SDG', 'T', 'TDG', 'SWAP', 'CTRL', 'ROTATE',
+}
+
 QUANTUM_CIRCUIT_MARKER_MOVE_LEFT = 1
 QUANTUM_CIRCUIT_MARKER_MOVE_RIGHT = 2
 QUANTUM_CIRCUIT_MARKER_MOVE_UP = 3

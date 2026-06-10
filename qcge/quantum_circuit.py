@@ -1,9 +1,10 @@
 import pygame
-from qiskit import QuantumRegister, QuantumCircuit
 import numpy as np
 
 from pygame.image import load as loadImage
 from qcge.configs import *
+from qcge.ir import CircuitIR
+from qcge.backends import get_backend
 
 
 class QuantumCircuitGridBackground(pygame.sprite.Sprite):
@@ -228,73 +229,66 @@ class QuantumCircuitGridModel():
         
         return control_wire
 
-    def create_quantum_circuit(self):
-        """Create Quantum Circuit from Quantum Circuit Grid"""
-        qr = QuantumRegister(self.num_qubits, "q")
-        qc = QuantumCircuit(qr)
+    def to_ir(self):
+        """Emit a backend-agnostic :class:`~qcge.ir.CircuitIR` from the grid.
+
+        This is the single source of truth for the circuit's semantics; every
+        execution backend (numpy, qiskit, ...) consumes it. The UI never builds a
+        framework-specific circuit directly, which is what keeps qcge runnable in a
+        browser build where Qiskit is unavailable.
+        """
+        ir = CircuitIR(self.num_qubits)
 
         for column in range(self.num_columns):
             for wire in range(self.num_qubits):
                 node = self.nodes[wire][column]
-                
-                if node:
-                    if node.gate_type == GATES['IDENTITY']:
-                        qc.i(qr[wire])
+                if not node:
+                    continue
 
-                    elif node.gate_type == GATES['X']:
-                        if node.rotation_angle == 0: # Node have a Pauli X Gate or Controlled X Gate or Toffoli Gate
-                            if node.first_ctrl != -1: # If first control is active
-                                if node.second_ctrl != -1: # If second control is also active then node have a Toffoli Gate
-                                    qc.ccx(qr[node.frist_ctrl], qr[node.second_ctrl], qr[wire])
-                                else: # Node have a Controlled X Gate
-                                    qc.cx(qr[node.frist_ctrl], qr[wire])
-                            else: # If no control is active then the node have a Pauli X Gate
-                                qc.x(qr[wire])
-                        else: # If angle is not zero then it is a RX Gate
-                            qc.rx(node.rotation_angle, qr[wire])
-                    
-                    elif node.gate_type == GATES['Y']:
-                        if node.rotation_angle == 0: # Node have a Pauli Y Gate or Controlled Y Gate
-                            if node.first_ctrl != -1: # If first control is active then Node have a CY Gate
-                                qc.cy(qr[self.first_ctrl], qr[wire])
-                            else: # If no control is active then the node have a Pauli Y Gate
-                                qc.y(qr[wire])
-                    
-                    elif node.gate_type == GATES['Z']:
-                        if node.rotation_angle == 0: # Node have a Pauli Z Gate or Controlled Z Gate
-                            if node.first_ctrl != -1: # If first control is active then Node have a CZ Gate
-                                qc.cz(qr[self.first_ctrl], qr[wire])
-                            else: # If no control is active then the node have a Pauli Z Gate
-                                qc.z(qr[wire])
-                    
-                    elif node.gate_type == GATES['S']:
-                        qc.s(qr[wire])
-                    
-                    elif node.gate_type == GATES['SDG']:
-                        qc.sdg(qr[wire])
-                    
-                    elif node.gate_type == GATES['T']:
-                        qc.t(qr[wire])
-                    
-                    elif node.gate_type == GATES['TDG']:
-                        qc.tdg(qr[wire])
-                    
-                    elif node.gate_type == GATES['H']:
-                        if node.first_ctrl != -1: # If first control is active then Node have a CH Gate
-                            qc.ch(qr[self.first_ctrl], qr[wire])
-                        else: # If no control is active then the node have a H Gate
-                            qc.h(qr[wire])
-                    
-                    elif node.gate_type == GATES['SWAP']:
-                        if node.first_ctrl != -1: # If first control is active then Node have a Controlled Swap Gate
-                            qc.cswap(qr[self.first_ctrl], qr[wire])
-                        else: # If no control is active then the node have a Swap Gate
-                            qc.swap(qr[wire])
-        
-        return qc
+                controls = tuple(c for c in (node.first_ctrl, node.second_ctrl) if c != -1)
+                gate = node.gate_type
+
+                if gate == GATES["IDENTITY"]:
+                    ir.add("i", (wire,))
+                elif gate == GATES["X"]:
+                    if node.rotation_angle != 0:  # parameterised RX (controls not modelled by the grid)
+                        ir.add("rx", (wire,), param=node.rotation_angle)
+                    else:  # Pauli-X / CX / Toffoli depending on number of controls
+                        ir.add("x", (wire,), controls=controls)
+                elif gate == GATES["Y"]:
+                    ir.add("y", (wire,), controls=controls)
+                elif gate == GATES["Z"]:
+                    ir.add("z", (wire,), controls=controls)
+                elif gate == GATES["S"]:
+                    ir.add("s", (wire,))
+                elif gate == GATES["SDG"]:
+                    ir.add("sdg", (wire,))
+                elif gate == GATES["T"]:
+                    ir.add("t", (wire,))
+                elif gate == GATES["TDG"]:
+                    ir.add("tdg", (wire,))
+                elif gate == GATES["H"]:
+                    ir.add("h", (wire,), controls=controls)
+                elif gate == GATES["SWAP"]:
+                    # a swap spans two wires; emit once, from the lower wire, so the
+                    # partner node does not double-apply it
+                    if node.swap != -1 and wire < node.swap:
+                        ir.add("swap", (wire, node.swap), controls=controls)
+
+        return ir
+
+    def create_quantum_circuit(self):
+        """Build a ``qiskit.QuantumCircuit`` from the grid (compatibility shim).
+
+        Retained for callers of the v1 API. Requires the optional Qiskit extra
+        (``pip install qcge[qiskit]``); prefer :meth:`to_ir` plus a backend.
+        """
+        from qcge.backends.qiskit_backend import QiskitBackend
+
+        return QiskitBackend().to_qiskit(self.to_ir())
 
 class QuantumCircuitGrid(pygame.sprite.RenderPlain):
-    def __init__(self, position, num_qubits, num_columns, background_color=QUANTUM_CIRCUIT_BG_COLOR, wire_color=QUANTUM_CIRCUIT_WIRE_COLOR, gate_phase_angle_color=QUANTUM_GATE_PHASE_COLOR, tile_size=QUANTUM_CIRCUIT_TILE_SIZE, gate_dimensions=[GATE_TILE_WIDTH, GATE_TILE_HIEGHT], wire_line_width=WIRE_LINE_WIDTH):
+    def __init__(self, position, num_qubits, num_columns, background_color=QUANTUM_CIRCUIT_BG_COLOR, wire_color=QUANTUM_CIRCUIT_WIRE_COLOR, gate_phase_angle_color=QUANTUM_GATE_PHASE_COLOR, tile_size=QUANTUM_CIRCUIT_TILE_SIZE, gate_dimensions=[GATE_TILE_WIDTH, GATE_TILE_HIEGHT], wire_line_width=WIRE_LINE_WIDTH, backend="auto"):
         super().__init__()
 
         ## Props
@@ -304,12 +298,15 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
         self.tile_size = tile_size
         self.gate_dimensions = gate_dimensions
         self.wire_line_width = wire_line_width
-        
+
+        ## Execution backend ("auto" picks Qiskit if installed, else the numpy sim)
+        self._backend = get_backend(backend)
+
         ## State
         self.position = position
         self.current_wire = 0
         self.current_column = 0
-        
+
         self.qc_grid_model = QuantumCircuitGridModel(num_qubits, num_columns)
         self.qc_grid_background = QuantumCircuitGridBackground(self.qc_grid_model, background_color=self.background_color, wire_color=self.wire_color, tile_size=self.tile_size, wire_line_width=self.wire_line_width)
         self.qc_grid_marker = QuantumCircuitGridMarker()
@@ -330,6 +327,35 @@ class QuantumCircuitGrid(pygame.sprite.RenderPlain):
     
     def get_gate_at_current_node(self):
         return self.qc_grid_model.get_gate_at_node(self.current_wire, self.current_column)
+
+    ## QUANTUM EXECUTION (backend-agnostic)
+    def to_ir(self):
+        """Backend-agnostic IR of the current grid."""
+        return self.qc_grid_model.to_ir()
+
+    def set_backend(self, name):
+        """Switch execution backend at runtime ("auto"/"qiskit"/"numpy"/"sim")."""
+        self._backend = get_backend(name)
+
+    @property
+    def backend(self):
+        return self._backend
+
+    def run(self):
+        """Simulate the current circuit, returning a :class:`SimulationResult`."""
+        return self._backend.run(self.to_ir())
+
+    def get_statevector(self):
+        """Complex amplitude vector of the current circuit (little-endian)."""
+        return self.run().statevector
+
+    def get_counts(self, shots=1024):
+        """Sampled measurement counts ``{bitstring: count}`` over ``shots`` shots."""
+        return self.run().sample_counts(shots)
+
+    def create_quantum_circuit(self):
+        """Compatibility shim: a ``qiskit.QuantumCircuit`` (needs the qiskit extra)."""
+        return self.qc_grid_model.create_quantum_circuit()
     
     ## HANDLE UPDATES    
     def update_sprites(self):

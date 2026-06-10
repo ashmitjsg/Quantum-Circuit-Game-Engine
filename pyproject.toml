@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qcge"
+version = "2.0.0"
+description = "Quantum Circuit Game Engine - build pygame quantum-circuit games that run with real Qiskit on desktop or a dependency-free simulator in the browser."
+readme = "readme.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Ashmit JaiSarita Gupta", email = "ashmitgupta.social@gmail.com" }]
+keywords = [
+    "quantum circuit game engine", "quantum circuit pygame", "quantum circuit",
+    "qcge", "quantum game", "pygame", "qiskit", "pygbag", "webassembly",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Operating System :: OS Independent",
+]
+
+# Core runtime: deliberately NO qiskit, so the package installs (and the numpy
+# backend runs) everywhere including a pygbag/WebAssembly browser build.
+dependencies = [
+    "numpy>=1.21",
+    "pygame>=2.1",
+]
+
+[project.optional-dependencies]
+# Real Qiskit execution backend for desktop/notebook use. Qiskit 1.x is
+# end-of-life (security support ended April 2026), so we require the current 2.x.
+qiskit = ["qiskit>=2.0"]
+# Everything needed to develop and test qcge.
+dev = ["pytest>=7", "pytest-cov", "qiskit>=2.0"]
+
+[project.urls]
+Homepage = "https://github.com/devilkiller-ag/Quantum-Circuit-Game-Engine"
+Source = "https://github.com/devilkiller-ag/Quantum-Circuit-Game-Engine"
+PyPI = "https://pypi.org/project/qcge/"
+
+[tool.setuptools.packages.find]
+include = ["qcge*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

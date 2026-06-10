@@ -8,6 +8,8 @@ This Quantum Circuit was originaly created for the **QPong Game** developed by <
 
 The features I have included are:
 - Modular and Abstract Code.
+- **Pluggable execution backends (new in v2):** run circuits with real **Qiskit** on the desktop, or a dependency-free **numpy statevector simulator** that also works in the browser (pygbag/WebAssembly), where Qiskit cannot run. The engine auto-selects the best available backend.
+- **Qiskit is optional.** `pip install qcge` ships the simulator; `pip install qcge[qiskit]` adds the real Qiskit backend (Qiskit **2.x**; 1.x is end-of-life).
 - All configurations in one place in the `config.py` file.
 - Developers can create a Quantum Circuit for any number of qubit/wires and circuit width (max. number of gates which can be applied in a wire) of their choice. 
 - Easy to change UI by replacing color configs and graphics for gates with those of your choice. 
@@ -18,16 +20,40 @@ The features I have included are:
 **If this project is helpful for you or you liked my work, consider supporting me through <a href="https://ko-fi.com/jaisarita" target="_blank">Ko.fi🍵</a>. Also, kindly consider giving a star to this repository.😁**
 
 <!-- ------------------------------------------------------------------------- -->
+<h2>Roadmap</h2>
+
+The v2 backend system (a backend-agnostic circuit IR + a pluggable `QuantumBackend`
+strategy) is designed so new execution targets slot in without touching any game or
+UI code. Planned next:
+
+- **Real quantum hardware backend.** An `IBMBackend` (`backend="ibm"`, optional
+  extra `qcge[ibm]`) built on `qiskit-ibm-runtime`'s `SamplerV2`, where the player
+  supplies their own IBM Quantum API token/credits and runs the circuit they built
+  on a real QPU. Because hardware jobs are queued and take seconds-to-minutes, this
+  is intended as an explicit *"run on real hardware"* action (async, result shown
+  when ready) rather than the real-time game loop. Hardware returns measurement
+  counts (no statevector), which the uniform `SimulationResult` already accommodates.
+  Desktop-only, since a browser/WebAssembly build cannot securely hold credentials.
+- More simulator backends (e.g. `qiskit-aer` for noisy/shot-based simulation).
+- Additional gates and an explicit measurement node in the grid UI.
+
+<!-- ------------------------------------------------------------------------- -->
 <h2>About me</h2>
 
-I am Ashmit JaiSarita Gupta, an Engineering Physics Undergraduate passionate about Quantum Computing, Machine Learning, UI/UX, and Web Development. I have worked on many projects in these fields, participated in hackathons, and am a part of great organizations in these fields. You can explore more about me, my work, and my experience at various organizations through my portfolio website: <a href='https://jaisarita.vercel.app/' target="_blank">https://jaisarita.vercel.app/</a> ☄️
+I am Ashmit JaiSarita Gupta, an Engineering Physics Undergraduate passionate about Quantum Computing, Machine Learning, UI/UX, and Web Development. I have worked on many projects in these fields, participated in hackathons, and am a part of great organizations in these fields. You can explore more about me, my work, and my experience at various organizations through my portfolio website: <a href='https://ashmitjsg.vercel.app/' target="_blank">https://ashmitjsg.vercel.app/</a> ☄️
 
 <!-- ------------------------------------------------------------------------- -->
 <h2>Installation</h2>
 
 ```bash
+# core engine + dependency-free simulator (works everywhere, incl. browser builds)
 pip install qcge
+
+# add the real Qiskit backend for desktop/notebook use
+pip install qcge[qiskit]
 ```
+
+> Requires Python ≥ 3.9. The `qiskit` extra pulls Qiskit ≥ 2.0.
 <!-- ------------------------------------------------------------------------- -->
 <h2>Usage</h2>
 
@@ -42,15 +68,40 @@ You can use it simply by creating an object of the `QuantumCircuitGrid` class st
 - `wire_color` (Optional Default Value = '#ffffff'): Color of Quantum Wire in the Quantum Circuit.
 - `gate_phase_angle_color` (Optional Default Value = '#97ad40'): Color to represent phase angle of Rotation Gates.
 
-You can run your quantum circuit on BasicAer Simulator by using this function:
+### Running (simulating) the circuit
+
+The grid simulates itself through the selected backend - no Qiskit boilerplate, no
+removed `BasicAer`/`execute`:
+
 ```python
-def run_quantum_circuit(self, quantum_circuit):
-        simulator = BasicAer.get_backend("statevector_simulator")
-        quantum_circuit.measure_all()
-        transpiled_circuit = transpile(quantum_circuit, simulator)
-        counts = simulator.run(transpiled_circuit, shots=1).result().get_counts()
-        measured_state = int(list(counts.keys())[0], 2)
-        return measured_state
+from qcge import QuantumCircuitGrid
+
+# backend="auto" (default) -> Qiskit if installed, else the numpy simulator
+grid = QuantumCircuitGrid(position=(0, 0), num_qubits=2, num_columns=8)
+
+# ...player builds a circuit on the grid...
+
+statevector = grid.get_statevector()      # complex amplitudes (little-endian, Qiskit order)
+counts      = grid.get_counts(shots=1024) # {"00": 512, "11": 512, ...}
+result      = grid.run()                   # full SimulationResult (probabilities/sampling/most_likely)
+measured    = int(result.most_likely(), 2)
+```
+
+Choose or switch the backend explicitly:
+
+```python
+QuantumCircuitGrid(..., backend="qiskit")  # real Qiskit (needs qcge[qiskit])
+QuantumCircuitGrid(..., backend="sim")     # numpy simulator (browser-safe, zero extra deps)
+grid.set_backend("numpy")                  # switch at runtime
+
+from qcge import available_backends, get_backend
+available_backends()                        # e.g. ["qiskit", "numpy"] or ["numpy"]
+```
+
+You can still get a raw `qiskit.QuantumCircuit` when needed (requires the qiskit extra):
+
+```python
+qc = grid.create_quantum_circuit()  # or grid.to_ir() for the backend-agnostic IR
 ```
 
 <!-- ------------------------------------------------------------------------- -->

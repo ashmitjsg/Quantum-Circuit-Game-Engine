@@ -17,7 +17,7 @@ The features I have included are:
 - Easily change controls by changing keys in the `handle_input()` method of the `QuantumCircuitGrid` class.
 
 
-**If this project is helpful for you or you liked my work, consider supporting me through <a href="https://ko-fi.com/jaisarita" target="_blank">Ko.fi🍵</a>. Also, kindly consider giving a star to this repository.😁**
+**If this project is helpful for you or you liked my work, consider supporting me through <a href="https://ko-fi.com/ashmitjsg" target="_blank">Ko.fi🍵</a>. Also, kindly consider giving a star to this repository.😁**
 
 <!-- ------------------------------------------------------------------------- -->
 <h2>Roadmap</h2>

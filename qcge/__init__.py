@@ -11,13 +11,20 @@ inside pygbag breaks the SDL display - so the default ``backend="auto"`` resolve
 to the pure-Python simulator there without ever importing numpy.
 """
 
+from importlib.metadata import version as _pkg_version, PackageNotFoundError
+
 from qcge.configs import *
 from qcge.ir import CircuitIR, GateOp, SUPPORTED_GATES
 from qcge.result import SimulationResult
 from qcge.backends import QuantumBackend, get_backend, available_backends
 from qcge.quantum_circuit import QuantumCircuitGrid
 
-__version__ = "2.0.0"
+# Single source of truth for the version is pyproject.toml; read it from the
+# installed package metadata so __version__ can never drift out of sync.
+try:
+    __version__ = _pkg_version("qcge")
+except PackageNotFoundError:  # running from a source checkout that isn't installed
+    __version__ = "0.0.0+local"
 
 __all__ = [
     "QuantumCircuitGrid",

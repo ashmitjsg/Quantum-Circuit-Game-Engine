@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qcge"
-version = "2.0.1"
+version = "2.0.2"
 description = "Quantum Circuit Game Engine - build pygame quantum-circuit games that run with real Qiskit on desktop or a dependency-free simulator in the browser."
 readme = "readme.md"
 license = { text = "MIT" }

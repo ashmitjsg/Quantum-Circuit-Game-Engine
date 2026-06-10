@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qcge"
-version = "2.0.0"
+version = "2.0.1"
 description = "Quantum Circuit Game Engine - build pygame quantum-circuit games that run with real Qiskit on desktop or a dependency-free simulator in the browser."
 readme = "readme.md"
 license = { text = "MIT" }
@@ -44,8 +44,9 @@ qiskit = ["qiskit>=2.0"]
 dev = ["pytest>=7", "pytest-cov", "qiskit>=2.0"]
 
 [project.urls]
-Homepage = "https://github.com/devilkiller-ag/Quantum-Circuit-Game-Engine"
-Source = "https://github.com/devilkiller-ag/Quantum-Circuit-Game-Engine"
+Homepage = "https://github.com/ashmitjsg/Quantum-Circuit-Game-Engine"
+Source = "https://github.com/ashmitjsg/Quantum-Circuit-Game-Engine"
+Issues = "https://github.com/ashmitjsg/Quantum-Circuit-Game-Engine/issues"
 PyPI = "https://pypi.org/project/qcge/"
 
 [tool.setuptools.packages.find]

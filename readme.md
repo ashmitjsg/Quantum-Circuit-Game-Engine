@@ -21,6 +21,18 @@ The features I have included are:
 **If this project is helpful for you or you liked my work, consider supporting me through <a href="https://ko-fi.com/ashmitjsg" target="_blank">Ko.fi🍵</a>. Also, kindly consider giving a star to this repository.😁**
 
 <!-- ------------------------------------------------------------------------- -->
+<h2>Games built with qcge</h2>
+
+Two full games already run on qcge - same engine, very different genres - both playable in the browser (no install) and open-source:
+
+- **Quantum Breakout** - a quantum re-imagining of Atari's *Breakout*: your paddle is a multi-qubit state and you steer it by building a quantum circuit, learning superposition, measurement/collapse, phase, and entanglement one level at a time.
+  ▶ Play: https://ashmitjsg.itch.io/quantum-breakout · Source: https://github.com/ashmitjsg/Quantum-Breakout
+- **QuantaVania** - an action-adventure platformer where you build real quantum circuits to fight through each level; enemies carry quantum states and you measure your circuit to match/counter them.
+  ▶ Play: https://ashmitjsg.itch.io/quantavania · Source: https://github.com/ashmitjsg/QuantaVania
+
+Both use the exact same circuit engine (real Qiskit on desktop, the pure-Python simulator in the browser), which shows how qcge lets you add quantum controls to any pygame game without writing quantum programs from scratch.
+
+<!-- ------------------------------------------------------------------------- -->
 <h2>Roadmap</h2>
 
 The v2 backend system (a backend-agnostic circuit IR + a pluggable `QuantumBackend`
